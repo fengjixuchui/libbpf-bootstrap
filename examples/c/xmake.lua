@@ -11,7 +11,7 @@ end
 option("system-libbpf",      {showmenu = true, default = false, description = "Use system-installed libbpf"})
 option("require-bpftool",    {showmenu = true, default = false, description = "Require bpftool package"})
 
-add_requires("libelf", "zlib")
+add_requires("elfutils", "zlib")
 if is_plat("android") then
     add_requires("ndk >=22.x", "argp-standalone")
     set_toolchains("@ndk", {sdkver = "23"})
@@ -46,7 +46,7 @@ else
         add_includedirs("../../libbpf/include/uapi", {public = true})
         add_includedirs("$(buildir)", {interface = true})
         add_configfiles("../../libbpf/src/(*.h)", {prefixdir = "bpf"})
-        add_packages("libelf", "zlib")
+        add_packages("elfutils", "zlib")
         if is_plat("android") then
             add_defines("__user=", "__force=", "__poll_t=uint32_t")
         end
@@ -54,7 +54,15 @@ end
 
 target("minimal")
     set_kind("binary")
-    add_files("minimal*.c")
+    add_files("minimal.c", "minimal.bpf.c")
+    add_packages("linux-headers")
+    if not has_config("system-libbpf") then
+        add_deps("libbpf")
+    end
+
+target("minimal_legacy")
+    set_kind("binary")
+    add_files("minimal_legacy.c", "minimal_legacy.bpf.c")
     add_packages("linux-headers")
     if not has_config("system-libbpf") then
         add_deps("libbpf")
@@ -62,7 +70,7 @@ target("minimal")
 
 target("bootstrap")
     set_kind("binary")
-    add_files("bootstrap*.c")
+    add_files("bootstrap.c", "bootstrap.bpf.c")
     add_packages("linux-headers")
     if not has_config("system-libbpf") then
         add_deps("libbpf")
@@ -73,7 +81,7 @@ target("bootstrap")
 
 target("fentry")
     set_kind("binary")
-    add_files("fentry*.c")
+    add_files("fentry.c", "fentry.bpf.c")
     add_packages("linux-headers")
     if not has_config("system-libbpf") then
         add_deps("libbpf")
@@ -81,7 +89,7 @@ target("fentry")
 
 target("uprobe")
     set_kind("binary")
-    add_files("uprobe*.c")
+    add_files("uprobe.c", "uprobe.bpf.c")
     add_packages("linux-headers")
     if not has_config("system-libbpf") then
         add_deps("libbpf")
@@ -89,7 +97,7 @@ target("uprobe")
 
 target("kprobe")
     set_kind("binary")
-    add_files("kprobe*.c")
+    add_files("kprobe.c", "kprobe.bpf.c")
     add_packages("linux-headers")
     if not has_config("system-libbpf") then
         add_deps("libbpf")

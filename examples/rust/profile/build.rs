@@ -1,9 +1,10 @@
 use std::fs::create_dir_all;
 use std::path::Path;
 
+extern crate libbpf_cargo;
 use libbpf_cargo::SkeletonBuilder;
 
-const SRC: &str = "./src/bpf/xdppass.bpf.c";
+const SRC: &str = "./src/bpf/profile.bpf.c";
 
 fn main() {
     // It's unfortunate we cannot use `OUT_DIR` to store the generated skeleton.
@@ -15,10 +16,10 @@ fn main() {
     // However, there is hope! When the above feature stabilizes we can clean this
     // all up.
     create_dir_all("./src/bpf/.output").unwrap();
-    let skel = Path::new("./src/bpf/.output/xdppass.skel.rs");
+    let skel = Path::new("./src/bpf/.output/profile.skel.rs");
     SkeletonBuilder::new()
         .source(SRC)
         .build_and_generate(&skel)
-        .unwrap();
+        .expect("bpf compilation failed");
     println!("cargo:rerun-if-changed={}", SRC);
 }

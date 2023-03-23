@@ -1,4 +1,6 @@
-# Demo BPF applications
+# libbpf-bootstrap: demo BPF applications
+
+[![Github Actions](https://github.com/libbpf/libbpf-bootstrap/actions/workflows/build.yml/badge.svg)](https://github.com/libbpf/libbpf-bootstrap/actions/workflows/build.yml)
 
 ## Minimal
 
@@ -19,6 +21,25 @@ $ sudo cat /sys/kernel/debug/tracing/trace_pipe
 
 `minimal` is great as a bare-bones experimental playground to quickly try out
 new ideas or BPF features.
+
+## Minimal_Legacy
+
+This version of `minimal` is modified to allow running on even older kernels
+that do not allow global variables. bpf_printk uses global variables unless
+BPF_NO_GLOBAL_DATA is defined before including bpf_helpers.h. Additionally,
+the global variable my_pid has been replaced with an array of one element to
+hold the process pid.
+
+```
+$ cd examples/c
+$ make minimal_legacy
+$ sudo ./minimal_legacy
+$ sudo cat /sys/kernel/debug/tracing/trace_pipe
+  minimal_legacy-52030 [001] .... 491227.784078: 0x00000001: BPF triggered from PID 52030.
+  minimal_legacy-52030 [001] .... 491228.840571: 0x00000001: BPF triggered from PID 52030.
+  minimal_legacy-52030 [001] .... 491229.841643: 0x00000001: BPF triggered from PID 52030.
+  minimal_legacy-52030 [001] .... 491230.842432: 0x00000001: BPF triggered from PID 52030.
+```
 
 ## Bootstrap
 
@@ -73,7 +94,7 @@ TIME     EVENT COMM             PID     PPID    FILENAME/EXIT CODE
 
 `uprobe` is an example of dealing with user-space entry and exit (return) probes,
 `uprobe` and `uretprobe` in libbpf lingo. It attached `uprobe` and `uretprobe`
-BPF programs to its own function (`uprobe_trigger()`) and logs input arguments
+BPF programs to its own functions (`uprobed_add()` and `uprobed_sub()`) and logs input arguments
 and return result, respectively, using `bpf_printk()` macro. The user-space
 function is triggered once every second:
 
@@ -88,15 +109,39 @@ Successfully started!
 You can see `uprobe` demo output in `/sys/kernel/debug/tracing/trace_pipe`:
 ```shell
 $ sudo cat /sys/kernel/debug/tracing/trace_pipe
-           <...>-461101 [018] d... 505432.345032: bpf_trace_printk: UPROBE ENTRY: a = 0, b = 1
-           <...>-461101 [018] d... 505432.345042: bpf_trace_printk: UPROBE EXIT: return = 1
-           <...>-461101 [018] d... 505433.345186: bpf_trace_printk: UPROBE ENTRY: a = 1, b = 2
-           <...>-461101 [018] d... 505433.345202: bpf_trace_printk: UPROBE EXIT: return = 3
-           <...>-461101 [018] d... 505434.345342: bpf_trace_printk: UPROBE ENTRY: a = 2, b = 3
-           <...>-461101 [018] d... 505434.345367: bpf_trace_printk: UPROBE EXIT: return = 5
+          uprobe-1809291 [007] .... 4017233.106596: 0: uprobed_add ENTRY: a = 0, b = 1
+          uprobe-1809291 [007] .... 4017233.106605: 0: uprobed_add EXIT: return = 1
+          uprobe-1809291 [007] .... 4017233.106606: 0: uprobed_sub ENTRY: a = 0, b = 0
+          uprobe-1809291 [007] .... 4017233.106607: 0: uprobed_sub EXIT: return = 0
+          uprobe-1809291 [007] .... 4017234.106694: 0: uprobed_add ENTRY: a = 1, b = 2
+          uprobe-1809291 [007] .... 4017234.106697: 0: uprobed_add EXIT: return = 3
+          uprobe-1809291 [007] .... 4017234.106700: 0: uprobed_sub ENTRY: a = 1, b = 1
+          uprobe-1809291 [007] .... 4017234.106701: 0: uprobed_sub EXIT: return = 0
 ```
 
-# Fentry
+## USDT
+
+`usdt` is an example of dealing with USDT probe. It attaches USDT BPF programs to
+the [libc:setjmp](https://www.gnu.org/software/libc/manual/html_node/Non_002dlocal-Goto-Probes.html) probe, which is triggered by calling `setjmp` in user-space program once per second and logs USDT arguments using `bpf_printk()` macro:
+
+```shell
+$ sudo ./usdt
+libbpf: loading object 'usdt_bpf' from buffer
+...
+Successfully started!
+...........
+```
+
+You can see `usdt` demo output in `/sys/kernel/debug/tracing/trace_pipe`:
+```shell
+$ sudo cat /sys/kernel/debug/tracing/trace_pipe
+            usdt-1919077 [005] d..21 537310.886092: bpf_trace_printk: USDT auto attach to libc:setjmp: arg1 = 55d03d6a42a0, arg2 = 0, arg3 = 55d03d65e54e
+            usdt-1919077 [005] d..21 537310.886105: bpf_trace_printk: USDT manual attach to libc:setjmp: arg1 = 55d03d6a42a0, arg2 = 0, arg3 = 55d03d65e54e
+            usdt-1919077 [005] d..21 537311.886214: bpf_trace_printk: USDT auto attach to libc:setjmp: arg1 = 55d03d6a42a0, arg2 = 0, arg3 = 55d03d65e54e
+            usdt-1919077 [005] d..21 537311.886227: bpf_trace_printk: USDT manual attach to libc:setjmp: arg1 = 55d03d6a42a0, arg2 = 0, arg3 = 55d03d65e54e
+```
+
+## Fentry
 
 `fentry` is an example that uses fentry and fexit BPF programs for tracing. It
 attaches `fentry` and `fexit` traces to `do_unlinkat()` which is called when a
@@ -131,7 +176,7 @@ $ sudo cat /sys/kernel/debug/tracing/trace_pipe
               rm-9290    [004] d..2  4637.798843: bpf_trace_printk: fexit: pid = 9290, filename = test_file2, ret = 0
 ```
 
-# Kprobe
+## Kprobe
 
 `kprobe` is an example of dealing with kernel-space entry and exit (return)
 probes, `kprobe` and `kretprobe` in libbpf lingo. It attaches `kprobe` and
@@ -157,7 +202,7 @@ $ sudo cat /sys/kernel/debug/tracing/trace_pipe
               rm-9346    [005] d..4  4710.951895: bpf_trace_printk: KPROBE EXIT: ret = 0
 ```
 
-# XDP
+## XDP
 
 `xdp` is an example written in Rust (using libbpf-rs). It attaches to
 the ingress path of networking device and logs the size of each packet,
@@ -180,6 +225,67 @@ $ sudo cat /sys/kernel/debug/tracing/trace_pipe
            <...>-2813507 [000] d.s1 602386.696735: bpf_trace_printk: packet size: 66
 ```
 
+## TC
+
+`tc` (short for Traffic Control) is an example of handling ingress network traffics.
+It creates a qdisc on the `lo` interface and attaches the `tc_ingress` BPF program to it.
+It reports the metadata of the IP packets that coming into the `lo` interface.
+
+```shell
+$ sudo ./tc
+...
+Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` to see output of the BPF program.
+......
+```
+
+The `tc` output in `/sys/kernel/debug/tracing/trace_pipe` should look
+something like this:
+
+```
+$ sudo cat /sys/kernel/debug/tracing/trace_pipe
+            node-1254811 [007] ..s1 8737831.671074: 0: Got IP packet: tot_len: 79, ttl: 64
+            sshd-1254728 [006] ..s1 8737831.674334: 0: Got IP packet: tot_len: 79, ttl: 64
+            sshd-1254728 [006] ..s1 8737831.674349: 0: Got IP packet: tot_len: 72, ttl: 64
+            node-1254811 [007] ..s1 8737831.674550: 0: Got IP packet: tot_len: 71, ttl: 64
+```
+
+## Profile
+
+`profile` is an example written in Rust and C with BlazeSym. It
+attaches to perf events, sampling on every processor periodically. It
+shows addresses, symbols, file names, and line numbers of stacktraces.
+
+```shell
+$ sudo ./target/release/profile
+COMM: swapper/6 (pid=0) @ CPU 6
+Kernel:
+  0 [<ffffffff81bdf010>] intel_idle+0x96
+  1 [<ffffffff819959b0>] cpuidle_enter_state+0x80 /ro/source/drivers/cpuidle/cpuidle.c:238
+  2 [<ffffffff81995cc9>] cpuidle_enter+0x29 /ro/source/drivers/cpuidle/cpuidle.c:353
+  3 [<ffffffff810f8c0b>] do_idle+0x1bb /ro/source/kernel/sched/idle.c:243
+  4 [<ffffffff810f8de9>] cpu_startup_entry+0x19 /ro/source/kernel/sched/idle.c:396
+  5 [<ffffffff81044f46>] start_secondary+0x116 /ro/source/arch/x86/kernel/smpboot.c:272
+  6 [<ffffffff810000f5>] secondary_startup_64_no_verify+0xb0 /ro/source/arch/x86/kernel/head_64.S:283
+No Userspace Stack
+```
+
+C version and Rust version show the same content.  Both of them use BlazeSym to symbolize stacktraces.
+
+## Socket filter
+
+`sockfilter` is an example of monitoring packet and dealing with `__sk_buff`
+structure. It attaches `socket` BPF program to `sock_queue_rcv_skb()` function
+and retrieve information from `BPF_MAP_TYPE_RINGBUF`, then print
+protocol, src IP, src port, dst IP, dst port in standard output.
+Currently, most of the IPv4 protocols defined in `uapi/linux/in.h` are included,
+please check `ipproto_mapping` of `examples/c/sockfilter.c` for the supported protocols.
+
+```shell
+$ sudo ./sockfilter
+interface:lo    protocol: UDP   127.0.0.1:51845(src) -> 127.0.0.1:53(dst)
+interface:lo    protocol: UDP   127.0.0.1:41552(src) -> 127.0.0.1:53(dst)
+```
+
 # Building
 
 libbpf-bootstrap supports multiple build systems that do the same thing.
@@ -187,7 +293,23 @@ This serves as a cross reference for folks coming from different backgrounds.
 
 ## Install Dependencies
 
-You will need `clang`, `libelf` and `zlib` to build the examples.
+You will need `clang`, `libelf` and `zlib` to build the examples, package names may vary across distros.
+
+On Ubuntu/Debian, you need:
+```shell
+$ apt install clang libelf1 libelf-dev zlib1g-dev
+```
+
+On CentOS/Fedora, you need:
+```shell
+$ dnf install clang elfutils-libelf elfutils-libelf-devel zlib-devel
+```
+## Getting the source code
+
+Download the git repository and check out submodules:
+```shell
+$ git clone --recurse-submodules https://github.com/libbpf/libbpf-bootstrap
+```
 
 ## C Examples
 
